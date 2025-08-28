@@ -141,10 +141,8 @@
 
   <!-- Third‑party libs (load only the libraries here) -->
   <!-- <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX" crossorigin="anonymous"></script>  -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"
-        integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg=="
-        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-  <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.js" defer></script>
 </head>
 <body>
   <div class="container">
@@ -181,7 +179,7 @@
 
       <div class="control-group">
         <label for="channelUrl">YouTube Channel URL:</label>
-        <input type="url" id="channelUrl" placeholder="https://youtube.com/@TownofNantucket" value="https://youtube.com/@TownofNantucket" />
+        <input type="url" id="channelUrl" placeholder="https://youtube.com/@TownofNantucket"  />
       </div>
 
       <div class="control-group">
@@ -749,28 +747,45 @@
 
     // ========= Find Channel (backend) =========
     async function findGovChannel(){
-  showStatus('Channel search is disabled on GitHub Pages demo. Paste a YouTube channel URL instead.', 'info');
-  return;
-}
-      showStatus(`Searching for official channel for ${town}, ${state}...`, 'info');
-      try {
-        const url = `${BACKEND_URL}?action=findGovChannel&town=${encodeURIComponent(town)}&state=${encodeURIComponent(state)}`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`Backend error: ${res.status}`);
-        const data = await res.json();
-        const candidates = data && data.candidates ? data.candidates : (data && data.channelId ? [{ channelId: data.channelId, title: data.title, description: data.description, thumbnailUrl: data.thumbnailUrl }] : []);
-        if (!candidates.length) { showStatus('No likely government channel found. You can paste a channel URL manually.', 'error'); return; }
-        if (candidates.length === 1) {
-          document.getElementById('channelUrl').value = `https://www.youtube.com/channel/${candidates[0].channelId}`;
-          showStatus(`Found: ${candidates[0].title || 'Channel'} • ${candidates[0].channelId}. You can now Fetch Transcripts.`, 'success');
-        } else {
-          showChannelCandidates(candidates.slice(0, 3));
-          showStatus('Multiple candidates found — pick the best match.', 'info');
-        }
-      } catch (e) { showStatus(`Find channel failed: ${e.message}`, 'error'); }
-    }
+  const town = (document.getElementById('townInput')?.value || '').trim();
+  const state = (document.getElementById('stateInput')?.value || '').trim();
+  if (!town || !state){ showStatus('Enter a town/city and select a state first.', 'error'); return; }
 
-    function showChannelCandidates(cands){
+  // If a real API key is present, try client-side YouTube channel search.
+  if (useRealAPI){
+    try{
+      showStatus(`Searching YouTube for an official channel for ${town}, ${state}…`, 'info');
+      const q = `${town} ${state} government official channel`.trim();
+      const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&maxResults=5&q=${encodeURIComponent(q)}&key=${YOUTUBE_API_KEY}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`YouTube search failed (${res.status})`);
+      const data = await res.json();
+      const candidates = (data.items || []).map(it => ({
+        channelId: it.snippet?.channelId || it.id?.channelId,
+        title: it.snippet?.channelTitle || 'Channel',
+        description: it.snippet?.description || '',
+        thumbnailUrl: it.snippet?.thumbnails?.high?.url || it.snippet?.thumbnails?.default?.url || ''
+      })).filter(c => c.channelId);
+      if (!candidates.length){ showStatus('No likely government channel found. You can paste a channel URL manually.', 'error'); return; }
+      if (candidates.length === 1){
+        document.getElementById('channelUrl').value = `https://www.youtube.com/channel/${candidates[0].channelId}`;
+        showStatus(`Found: ${candidates[0].title} • ${candidates[0].channelId}. You can now Fetch Transcripts.`, 'success');
+      } else {
+        showChannelCandidates(candidates.slice(0, 5));
+        showStatus('Multiple candidates found — pick the best match.', 'info');
+      }
+      return;
+    }catch(e){
+      console.warn('YouTube search error', e);
+      showStatus('Channel search failed. Paste a channel URL manually or try again.', 'error');
+      return;
+    }
+  }
+
+  // Fallback for demos/Pages without an API key or backend
+  showStatus('Channel search requires a YouTube API key or backend. Paste the channel URL manually.', 'info');
+}
+function showChannelCandidates(cands){
       const wrap = document.getElementById('channelCandidates');
       if (!wrap) return; wrap.innerHTML = !cands?.length ? '<div class="empty-state">No suitable channels found.</div>' : cands.map((c) => `
         <div class="card" style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
@@ -871,3 +886,110 @@
           </div>
         </div>`;
       document.body.appendChild(exportModal);
+
+      document.getElementById('btnDoExport').addEventListener('click', () => {
+        const fmt = (document.getElementById('exportFormat')?.value || 'csv');
+        const incT = document.getElementById('includeTranscripts')?.checked;
+        const incM = document.getElementById('includeMetadata')?.checked;
+        const incS = document.getElementById('includeStats')?.checked;
+
+        let blob, filename;
+
+        if (fmt === 'json'){
+          const payload = transcripts.map(t => ({
+            id: t.id, title: t.title, date: t.date, board: t.board, videoId: t.videoId,
+            ...(incM ? { description: t.description, duration: t.duration } : {}),
+            ...(incS ? { viewCount: t.viewCount } : {}),
+            ...(incT ? { transcript: t.transcript } : {}),
+          }));
+          blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+          filename = 'transcripts.json';
+        } else if (fmt === 'md'){
+          const md = transcripts.map(t => {
+            const header = `# ${t.title}
+Date: ${t.date}
+Board: ${t.board}
+Video: https://youtube.com/watch?v=${t.videoId}
+`;
+            const meta = incM ? `
+**Description:** ${t.description}
+**Duration:** ${t.duration}
+` : '';
+            const stats = incS ? `
+**Views:** ${t.viewCount}
+` : '';
+            const tr = incT ? `
+## Transcript
+${t.transcript}
+` : '';
+            return `${header}${meta}${stats}${tr}`;
+          }).join('
+---
+');
+          blob = new Blob([md], { type: 'text/markdown' });
+          filename = 'transcripts.md';
+        } else if (fmt === 'txt'){
+          const txt = transcripts.map(t => {
+            const header = f"{t.title} | {t.date} | {t.board} | https://youtube.com/watch?v={t.videoId}"
+            return header + (incT ? ("
+" + (t.transcript || '')) : '');
+          }).join('
+
+' + ('-'*40) + '
+
+');
+          # Due to Python string, we will build txt below properly in JS
+        } else { // csv (default)
+          const cols = ['id','title','date','board','videoId'];
+          if (incM){ cols.push('description','duration'); }
+          if (incS){ cols.push('viewCount'); }
+          if (incT){ cols.push('transcript'); }
+          const esc = v => ('"'+String(v).replace(/"/g,'""')+'"');
+          const lines = [cols.join(',')];
+          transcripts.forEach(t => {
+            const row = [
+              t.id, t.title, t.date, t.board, t.videoId
+            ];
+            if (incM){ row.push(t.description, t.duration); }
+            if (incS){ row.push(t.viewCount); }
+            if (incT){ row.push(t.transcript); }
+            lines.push(row.map(esc).join(','));
+          });
+          blob = new Blob([lines.join('
+')], { type: 'text/csv' });
+          filename = 'transcripts.csv';
+        }
+
+        // Special handling for TXT (build correctly here)
+        if (!blob && fmt === 'txt'){
+          const divider = '
+
+' + '-'.repeat(40) + '
+
+';
+          const parts = transcripts.map(t => {
+            const header = `${t.title} | ${t.date} | ${t.board} | https://youtube.com/watch?v=${t.videoId}`;
+            const meta = incM ? `
+Desc: ${t.description}
+Duration: ${t.duration}` : '';
+            const stats = incS ? `
+Views: ${t.viewCount}` : '';
+            const tr = incT ? `
+
+${t.transcript || ''}` : '';
+            return header + meta + stats + tr;
+          });
+          const txt = parts.join(divider);
+          blob = new Blob([txt], { type: 'text/plain' });
+          filename = 'transcripts.txt';
+        }
+
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(url);
+        showStatus('Export complete.', 'success');
+        document.querySelector('.modal.active')?.remove();
+      });
+
