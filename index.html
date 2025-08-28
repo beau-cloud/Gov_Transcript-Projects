@@ -207,9 +207,7 @@
     <div class="filters" id="boardFilters">
       <div class="filter-chip active" data-board="all">All Boards</div>
       <!-- Tasteful top ad / sponsor slot -->
-      <div class="card ad-card" id="adTop" aria-label="Sponsored">
-        <ins class="adsbygoogle" style="display:block; min-height: 120px" data-ad-client="ca-pub-XXXXXXXXXXXXXXXX" data-ad-slot="NNNNNNNNNN" data-ad-format="auto" data-full-width-responsive="true"></ins>
-      </div>
+      <div class="card ad-card" id="adTop" aria-label="Sponsored"></div>
     </div>
 
     <div class="loading" id="loading"><div class="spinner"></div><p>Fetching and processing transcripts...</p></div>
@@ -272,8 +270,9 @@
   <script>
     // ========= Config =========
     // IMPORTANT: For production, do not expose keys client-side. Route via /.netlify/functions.
-    const YOUTUBE_API_KEY = 'PASTE_YOUR_API_KEY_HERE'; // Replace or proxy via serverless
-    const BACKEND_URL = '/.netlify/functions/youtube-api';
+    const YOUTUBE_API_KEY = 'AIzaSyCpPpUisS_eripFugM8kx6vgH5nAdsywV8'; // Replace or proxy via serverless
+    const BACKEND_URL = '';
+const HAS_BACKEND = !!BACKEND_URL && !/^\s*$/.test(BACKEND_URL);
 
     // ========= State =========
     let transcripts = [];
@@ -486,12 +485,30 @@
       return 'Town Meeting';
     }
 
-    async function processVideoTranscript(video) {
-      const boardType = extractBoardType(video.title);
-      let transcript;
-      if (useRealAPI) {
-        try {
-          const response = await fetch(`${BACKEND_URL}/api/transcript/${video.videoId}`);
+    async function processVideoTranscript(video){
+  const boardType = extractBoardType(video.title);
+  let transcript;
+  if (useRealAPI && HAS_BACKEND) {
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/transcript/${video.videoId}`);
+      if (!response.ok) throw new Error(`Backend responded ${response.status}`);
+      const data = await response.json();
+      transcript = data && (data.success ? data.transcript : null);
+      if (!transcript) throw new Error('No transcript returned');
+    } catch (e) {
+      console.warn('Transcript backend unavailable, using mock transcript.', e);
+      showStatus('Transcript backend not configured — using demo transcripts.', 'info');
+      transcript = generateMockTranscript(video, boardType);
+    }
+  } else {
+    if (useRealAPI && !HAS_BACKEND) {
+      // Running real video/metadata without transcripts backend
+      showStatus('Using real videos but demo transcripts (no backend configured).', 'info');
+    }
+    transcript = generateMockTranscript(video, boardType);
+  }
+  return { id: video.videoId, title: video.title, date: video.publishedAt.split('T')[0], board: boardType, videoId: video.videoId, description: video.description, transcript, duration: video.duration, viewCount: video.viewCount, thumbnailUrl: video.thumbnailUrl };
+}/api/transcript/${video.videoId}`);
           const data = await response.json();
           transcript = data.success ? data.transcript : generateMockTranscript(video, boardType);
         } catch { transcript = generateMockTranscript(video, boardType); }
@@ -545,7 +562,7 @@
       ad.setAttribute('aria-label', 'Sponsored');
       ad.innerHTML = '<ins class="adsbygoogle" style="display:block; min-height:120px" data-ad-client="ca-pub-XXXXXXXXXXXXXXXX" data-ad-slot="NNNNNNNNNN" data-ad-format="auto" data-full-width-responsive="true"></ins>';
       filtersEl.appendChild(ad);
-      refreshAds(document);
+      renderSponsorFallback(document);
     }
 
     function filterByBoard(board) {
@@ -783,7 +800,7 @@
   }
 
   // Fallback for demos/Pages without an API key or backend
-  showStatus('Channel search requires a YouTube API key or backend. Paste the channel URL manually.', 'info');
+  showStatus('Channel search needs a YouTube API key. For now, paste the channel URL manually.', 'info');
 }
 function showChannelCandidates(cands){
       const wrap = document.getElementById('channelCandidates');
@@ -807,7 +824,7 @@ function showChannelCandidates(cands){
       if (!channelUrl) { const t = (document.getElementById('townInput')?.value || '').trim(); const s = (document.getElementById('stateInput')?.value || '').trim(); if (t && s) { await findGovChannel(); } }
       const dateRange = document.getElementById('dateRange').value;
       const url = document.getElementById('channelUrl').value;
-      if (!url) { showStatus('Please enter a valid YouTube channel URL', 'error'); return; }
+      if (!url) { showStatus('Please enter a valid YouTube channel URL (tip: click Find Channel or paste one like https://youtube.com/@TownofNantucket)', 'error'); return; }
 
       showLoading(true); showStatus('Extracting channel information...', 'info');
       try {
@@ -823,7 +840,7 @@ function showChannelCandidates(cands){
           try { const transcriptData = await processVideoTranscript(video); if (transcriptData) transcripts.push(transcriptData); } catch (e) { console.warn('Could not process transcript for', video.title, e); }
         }
         showStatus(`Successfully processed ${transcripts.length} transcripts from ${videos.length} videos`, 'success');
-        renderTranscripts(); updateBoardFilters(); refreshAds(document);
+        renderTranscripts(); updateBoardFilters(); renderSponsorFallback(document);
       } catch (e) { showStatus(`Error: ${e.message}`, 'error'); console.error(e); }
       finally { showLoading(false); }
     }
