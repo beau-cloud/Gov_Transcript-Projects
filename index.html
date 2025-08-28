@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -140,7 +140,7 @@
   </style>
 
   <!-- Third‑party libs (load only the libraries here) -->
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX" crossorigin="anonymous"></script>
+  <!-- <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX" crossorigin="anonymous"></script>  -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"
         integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg=="
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>
@@ -727,7 +727,7 @@
       const temp = document.createElement('div');
       temp.style.padding = '20px'; temp.style.background = '#ffffff'; temp.style.color = '#111827'; temp.innerHTML = html;
       document.body.appendChild(temp);
-      html2pdf().from(temp).set({ margin: 10, filename: `${(__minutesCurrent?.title || 'minutes')}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'letter', orientation: 'portrait' } }).save().then(()=>{ document.body.removeChild(temp); }).catch(()=>{ document.body.removeChild(temp); });
+      html2pdf().from(temp).set({ margin: 10, filename: `${(__minutesCurrent?.title || 'minutes')}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true, allowTaint: false }, jsPDF: { unit: 'mm', format: 'letter', orientation: 'portrait' } }).save().then(()=>{ document.body.removeChild(temp); }).catch(()=>{ document.body.removeChild(temp); });
     }
     function triggerDownload(blob, filename){ const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); }
 
@@ -749,9 +749,9 @@
 
     // ========= Find Channel (backend) =========
     async function findGovChannel(){
-      const town = (document.getElementById('townInput')?.value || '').trim();
-      const state = (document.getElementById('stateInput')?.value || '').trim();
-      if (!town || !state) { showStatus('Please enter both town/city and state to find the channel.', 'error'); return; }
+  showStatus('Channel search is disabled on GitHub Pages demo. Paste a YouTube channel URL instead.', 'info');
+  return;
+}
       showStatus(`Searching for official channel for ${town}, ${state}...`, 'info');
       try {
         const url = `${BACKEND_URL}?action=findGovChannel&town=${encodeURIComponent(town)}&state=${encodeURIComponent(state)}`;
