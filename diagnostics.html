@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>YouTube API Diagnostics</title>
+  <style>
+    :root { --bg:#0b0e12; --text:#e8ecf1; --muted:#aeb6c2; --card:#121824; --border:#1f2a3a; --accent:#9fd0ff; }
+    html,body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Helvetica,Arial,sans-serif;margin:0}
+    .wrap{max-width:900px;margin:32px auto;padding:0 16px}
+    h1{font-size:1.6rem;margin:0 0 16px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 16px 8px;margin:12px 0}
+    label{display:block;margin:.25rem 0 .35rem;font-weight:600}
+    input,button,select,textarea{border:1px solid var(--border);border-radius:10px;background:#0e141d;color:var(--text);padding:10px}
+    button{cursor:pointer;font-weight:700}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    pre{background:#0d121a;border:1px solid var(--border);border-radius:10px;padding:12px;overflow:auto;white-space:pre-wrap}
+    .muted{color:var(--muted)}
+    code{color:var(--accent)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>YouTube API Diagnostics</h1>
+    <p class="muted">Use this page to verify that your API key and referrer settings allow requests from this origin.</p>
+
+    <div class="card">
+      <div class="row">
+        <div>
+          <label>Detected Origin</label>
+          <input id="origin" readonly />
+        </div>
+        <div>
+          <label>Detected Hostname/Path</label>
+          <input id="hostpath" readonly />
+        </div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <div>
+          <label>Referrer (if any)</label>
+          <input id="referrer" readonly />
+        </div>
+        <div>
+          <label>Suggested Referrer Patterns</label>
+          <input id="suggest" readonly />
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <label>YouTube Data API v3 Key</label>
+      <input id="apikey" placeholder="Paste your key (or keep default)" />
+      <small class="muted">If testing on localhost, add <code>http://localhost/*</code> and <code>http://127.0.0.1/*</code> to Website restrictions for this key. For GitHub Pages, add your Pages URL like <code>https://beau-cloud.github.io/*</code> and <code>https://beau-cloud.github.io/Gov_Transcript-Projects/*</code>.</small>
+    </div>
+
+    <div class="card">
+      <label>Quick Test Query</label>
+      <input id="query" value="Nantucket government official channel" />
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button id="btnTest">Run Search Test</button>
+        <button id="btnChannel">Resolve @Handle → channelId</button>
+      </div>
+      <div style="margin-top:12px">
+        <label>Result</label>
+        <pre id="out">No result yet.</pre>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0 0 8px">If it fails with 403 (Referer not allowed)</h3>
+      <ul class="muted">
+        <li>Open Google Cloud → <em>APIs &amp; Services → Credentials → your key</em>.</li>
+        <li>Application restrictions: <strong>HTTP referrers</strong>.</li>
+        <li>Website restrictions: add patterns shown above (GitHub Pages + localhost).</li>
+        <li>API restrictions: restrict to <strong>YouTube Data API v3</strong>.</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    // Default the field so you don't have to paste it again
+    const DEFAULT_API_KEY = "AIzaSyCpPpUisS_eripFugM8kx6vgH5nAdsywV8";
+
+    const $ = (id) => document.getElementById(id);
+    $('origin').value = location.origin;
+    $('hostpath').value = location.hostname + location.pathname;
+    $('referrer').value = document.referrer || '(none)';
+    $('suggest').value = `https://${location.hostname}/*`;
+    $('apikey').value = DEFAULT_API_KEY;
+
+    function logOut(obj, status, contentType) {
+      const safe = typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2);
+      $('out').textContent = `HTTP ${status} | ${contentType}\n\n` + safe;
+    }
+
+    async function runSearch() {
+      const key = $('apikey').value.trim();
+      if (!key) { logOut('Missing API key', '—', '—'); return; }
+      const q = $('query').value.trim() || 'Nantucket government official channel';
+      const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&maxResults=3&q=${encodeURIComponent(q)}&key=${key}`;
+      try {
+        const res = await fetch(url);
+        const ct = res.headers.get('content-type') || '';
+        let body;
+        try { body = await res.json(); } catch { body = await res.text(); }
+        logOut(body, res.status + ' ' + res.statusText, ct);
+      } catch (e) {
+        logOut(String(e), 'NETWORK', '—');
+      }
+    }
+
+    async function resolveHandle() {
+      const key = $('apikey').value.trim();
+      const handle = $('query').value.trim() || '@TownofNantucket';
+      const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&maxResults=1&q=${encodeURIComponent(handle)}&key=${key}`;
+      try {
+        const res = await fetch(url);
+        const ct = res.headers.get('content-type') || '';
+        const body = await res.json();
+        const item = body.items && body.items[0];
+        const channelId = item && (item.id?.channelId || item.snippet?.channelId);
+        logOut({channelId, raw: body}, res.status + ' ' + res.statusText, ct);
+      } catch (e) {
+        logOut(String(e), 'NETWORK', '—');
+      }
+    }
+
+    $('btnTest').onclick = runSearch;
+    $('btnChannel').onclick = resolveHandle;
+  </script>
+</body>
+</html>
