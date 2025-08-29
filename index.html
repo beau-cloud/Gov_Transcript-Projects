@@ -381,12 +381,13 @@ const HAS_BACKEND = !!BACKEND_URL && !/^\s*$/.test(BACKEND_URL);
     }
 
     async function getChannelIdFromHandle(handle) {
-      const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=${encodeURIComponent(handle)}&maxResults=1&key=${YOUTUBE_API_KEY}`;
-      const res = await fetch(searchUrl);
-      const data = await res.json();
-      if (data.items && data.items[0]) return data.items[0].snippet.channelId;
-      throw new Error('Channel not found');
-    }
+  const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=${encodeURIComponent(handle)}&maxResults=1&key=${YOUTUBE_API_KEY}`;
+  const res = await fetch(searchUrl);
+  const data = await res.json();
+  const item = data.items && data.items[0];
+  if (item) return item.id?.channelId || item.snippet?.channelId;
+  throw new Error('Channel not found');
+}
 
     async function fetchChannelVideos(channelInfo, dateRange) {
       if (!useRealAPI) {
@@ -508,17 +509,9 @@ const HAS_BACKEND = !!BACKEND_URL && !/^\s*$/.test(BACKEND_URL);
     transcript = generateMockTranscript(video, boardType);
   }
   return { id: video.videoId, title: video.title, date: video.publishedAt.split('T')[0], board: boardType, videoId: video.videoId, description: video.description, transcript, duration: video.duration, viewCount: video.viewCount, thumbnailUrl: video.thumbnailUrl };
-}/api/transcript/${video.videoId}`);
-          const data = await response.json();
-          transcript = data.success ? data.transcript : generateMockTranscript(video, boardType);
-        } catch { transcript = generateMockTranscript(video, boardType); }
-      } else {
-        transcript = generateMockTranscript(video, boardType);
-      }
-      return { id: video.videoId, title: video.title, date: video.publishedAt.split('T')[0], board: boardType, videoId: video.videoId, description: video.description, transcript, duration: video.duration, viewCount: video.viewCount, thumbnailUrl: video.thumbnailUrl };
-    }
+}
 
-    function generateMockTranscript(video, boardType) {
+function generateMockTranscript(video, boardType) {
       const map = {
         'Select Board': () => `[#] CHAIRPERSON: Good evening, everyone. This is the Select Board meeting for ${new Date(video.publishedAt).toLocaleDateString()}.
 [00:01:30] CHAIRPERSON: We'll begin with the approval of minutes.
@@ -545,17 +538,23 @@ const HAS_BACKEND = !!BACKEND_URL && !/^\s*$/.test(BACKEND_URL);
     }
 
     function updateBoardFilters() {
-      const boards = [...new Set(transcripts.map((t) => t.board))];
-      const filtersEl = document.getElementById('boardFilters');
-      filtersEl.innerHTML = '<div class="filter-chip active" data-board="all">All Boards</div>';
-      boards.forEach((board) => {
-        const chip = document.createElement('div');
-        chip.className = 'filter-chip';
-        chip.dataset.board = board;
-        chip.textContent = board;
-        chip.onclick = () => filterByBoard(board);
-        filtersEl.appendChild(chip);
-      });
+  const boards = [...new Set(transcripts.map((t) => t.board))];
+  const filtersEl = document.getElementById('boardFilters');
+  filtersEl.innerHTML = '<div class="filter-chip active" data-board="all">All Boards</div>';
+  boards.forEach((board) => {
+    const chip = document.createElement('div');
+    chip.className = 'filter-chip';
+    chip.dataset.board = board;
+    chip.textContent = board;
+    chip.onclick = () => filterByBoard(board);
+    filtersEl.appendChild(chip);
+  });
+  const ad = document.createElement('div');
+  ad.className = 'card ad-card';
+  ad.setAttribute('aria-label', 'Sponsored');
+  filtersEl.appendChild(ad);
+  renderSponsorFallback(document);
+});
       // re-add ad slot
       const ad = document.createElement('div');
       ad.className = 'card ad-card';
@@ -869,8 +868,131 @@ function showChannelCandidates(cands){
 
     // ========= Export Data =========
     function exportData(){
-      if (!transcripts.length) { showStatus('No data to export. Please fetch transcripts first.', 'error'); return; }
-      const exportModal = document.createElement('div');
+  if (!transcripts.length) { showStatus('No data to export. Please fetch transcripts first.', 'error'); return; }
+  const exportModal = document.createElement('div');
+  exportModal.className = 'modal active';
+  exportModal.innerHTML = `
+    <div class="modal-content" style="max-width: 500px;">
+      <div class="modal-header">
+        <h2 class="modal-title">Export Options</h2>
+        <button class="close-modal" onclick="this.closest('.modal').remove()">&times;</button>
+      </div>
+      <div style="padding: 20px 18px;">
+        <div style="margin-bottom: 20px;">
+          <label style="display:block; margin-bottom:10px; font-weight:600;">Export Format:</label>
+          <select id="exportFormat" style="width:100%; padding:10px; border:1px solid var(--border); background:var(--elev); color:var(--text); border-radius:8px;">
+            <option value="csv">CSV (Spreadsheet)</option>
+            <option value="json">JSON (Data)</option>
+            <option value="txt">TXT (Plain Text)</option>
+            <option value="md">Markdown (Documentation)</option>
+          </select>
+        </div>
+        <div style="margin-bottom: 20px;">
+          <label style="display:block; margin-bottom:10px; font-weight:600;">Include:</label>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <label style="display:flex; align-items:center; gap:8px; font-weight:normal;"><input type="checkbox" id="includeTranscripts" checked /> Full Transcripts</label>
+            <label style="display:flex; align-items:center; gap:8px; font-weight:normal;"><input type="checkbox" id="includeMetadata" checked /> Video Metadata</label>
+            <label style="display:flex; align-items:center; gap:8px; font-weight:normal;"><input type="checkbox" id="includeStats" checked /> View Statistics</label>
+          </div>
+        </div>
+        <div style="display:flex; gap:10px; margin-top: 30px;">
+          <button id="btnDoExport" style="flex:1; padding:12px; background: var(--accent); color:#0b0f17; border:none; border-radius:8px; cursor:pointer; font-weight:600;">📊 Export Data</button>
+          <button onclick="this.closest('.modal').remove()" style="flex:1; padding:12px; background:#f8f9fa; color:#495057; border:1px solid #dee2e6; border-radius:8px; cursor:pointer;">Cancel</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(exportModal);
+
+  document.getElementById('btnDoExport').addEventListener('click', () => {
+    const fmt = (document.getElementById('exportFormat')?.value || 'csv');
+    const incT = document.getElementById('includeTranscripts')?.checked;
+    const incM = document.getElementById('includeMetadata')?.checked;
+    const incS = document.getElementById('includeStats')?.checked;
+
+    let blob, filename;
+
+    if (fmt === 'json'){
+      const payload = transcripts.map(t => ({
+        id: t.id, title: t.title, date: t.date, board: t.board, videoId: t.videoId,
+        ...(incM ? { description: t.description, duration: t.duration } : {}),
+        ...(incS ? { viewCount: t.viewCount } : {}),
+        ...(incT ? { transcript: t.transcript } : {}),
+      }));
+      blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      filename = 'transcripts.json';
+    } else if (fmt === 'md'){
+      const md = transcripts.map(t => {
+        const header = `# ${t.title}
+Date: ${t.date}
+Board: ${t.board}
+Video: https://youtube.com/watch?v=${t.videoId}
+`;
+        const meta = incM ? `
+**Description:** ${t.description}
+**Duration:** ${t.duration}
+` : '';
+        const stats = incS ? `
+**Views:** ${t.viewCount}
+` : '';
+        const tr = incT ? `
+## Transcript
+${t.transcript}
+` : '';
+        return `${header}${meta}${stats}${tr}`;
+      }).join('
+---
+');
+      blob = new Blob([md], { type: 'text/markdown' });
+      filename = 'transcripts.md';
+    } else if (fmt === 'txt'){
+      const divider = '
+
+' + '-'.repeat(40) + '
+
+';
+      const parts = transcripts.map(t => {
+        const header = `${t.title} | ${t.date} | ${t.board} | https://youtube.com/watch?v=${t.videoId}`;
+        const meta = incM ? `
+Desc: ${t.description}
+Duration: ${t.duration}` : '';
+        const stats = incS ? `
+Views: ${t.viewCount}` : '';
+        const tr = incT ? `
+
+${t.transcript || ''}` : '';
+        return header + meta + stats + tr;
+      });
+      const txt = parts.join(divider);
+      blob = new Blob([txt], { type: 'text/plain' });
+      filename = 'transcripts.txt';
+    } else { // csv (default)
+      const cols = ['id','title','date','board','videoId'];
+      if (incM){ cols.push('description','duration'); }
+      if (incS){ cols.push('viewCount'); }
+      if (incT){ cols.push('transcript'); }
+      const esc = v => ('"'+String(v).replace(/"/g,'""')+'"');
+      const lines = [cols.join(',')];
+      transcripts.forEach(t => {
+        const row = [ t.id, t.title, t.date, t.board, t.videoId ];
+        if (incM){ row.push(t.description, t.duration); }
+        if (incS){ row.push(t.viewCount); }
+        if (incT){ row.push(t.transcript); }
+        lines.push(row.map(esc).join(','));
+      });
+      blob = new Blob([lines.join('
+')], { type: 'text/csv' });
+      filename = 'transcripts.csv';
+    }
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    showStatus('Export complete.', 'success');
+    document.querySelector('.modal.active')?.remove();
+  });
+}const exportModal = document.createElement('div');
       exportModal.className = 'modal active';
       exportModal.innerHTML = `
         <div class="modal-content" style="max-width: 500px;">
