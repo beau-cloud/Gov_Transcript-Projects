@@ -1,0 +1,9 @@
+{
+  "name": "osgt-transcript-backend",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "dependencies": {
+    "youtube-transcript": "^1.2.1"
+  }
+}
