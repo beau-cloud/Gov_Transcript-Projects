@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Open Source Government Transcripts</title>
+  <style>
+    :root{
+      --bg:#0b0d10;
+      --card:#12161b;
+      --muted:#94a3b8;
+      --text:#e6edf3;
+      --accent:#7dd3fc;
+      --border:#1f2937;
+      --ok:#10b981;
+      --warn:#f59e0b;
+      --err:#ef4444;
+    }
+    * { box-sizing: border-box }
+    html, body { height: 100% }
+    body{
+      margin:0;
+      background:var(--bg);
+      color:var(--text);
+      font-family: "Myanmar Text", system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
+      line-height:1.4;
+    }
+    header{
+      padding:20px;
+      border-bottom:1px solid var(--border);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:16px;
+    }
+    h1{ font-size:20px; margin:0; letter-spacing:0.2px }
+    .pill { padding:4px 10px; border:1px solid var(--border); border-radius:999px; color:var(--muted) }
+    main{ max-width:1100px; margin:0 auto; padding:18px; }
+    .controls{
+      display:grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap:10px;
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:16px;
+      padding:16px;
+    }
+    label{ font-size:12px; color:var(--muted) }
+    input[type="text"], input[type="date"], input[type="url"]{
+      width:100%;
+      padding:10px 12px;
+      background:#0f1318;
+      color:var(--text);
+      border:1px solid var(--border);
+      border-radius:10px;
+      outline:none;
+    }
+    input::placeholder{ color:#6b7280 }
+    .col-6{ grid-column: span 6 }
+    .col-4{ grid-column: span 4 }
+    .col-3{ grid-column: span 3 }
+    .col-2{ grid-column: span 2 }
+    .col-12{ grid-column: span 12 }
+    .btn{
+      appearance:none; border:1px solid var(--border); background:#11161b; color:var(--text);
+      padding:10px 14px; border-radius:10px; cursor:pointer;
+    }
+    .btn:hover{ border-color:#2c3643 }
+    .btn-primary{ background:#0f172a; border-color:#334155 }
+    .btn-primary:hover{ border-color:#475569 }
+    .note{ font-size:12px; color:var(--muted) }
+    .stack{ display:flex; flex-direction:column; gap:6px }
+    .row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap }
+    .results{
+      margin-top:18px;
+      display:grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap:12px;
+    }
+    .card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:16px;
+      padding:14px;
+      display:flex; flex-direction:column; gap:10px;
+    }
+    .title{ font-weight:600; font-size:14px }
+    .meta{ font-size:12px; color:var(--muted) }
+    .badg{ font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--border); color:var(--muted) }
+    .ok{ color:var(--ok) }
+    .warn{ color:var(--warn) }
+    .err{ color:var(--err) }
+    .transcript{
+      white-space:pre-wrap;
+      background:#0f1318;
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:12px;
+      max-height:340px; overflow:auto;
+      font-size:13px;
+    }
+    .footer{
+      margin: 28px auto;
+      max-width:1100px;
+      color:var(--muted);
+      font-size:12px;
+      border-top:1px dashed var(--border);
+      padding-top:12px;
+    }
+    a { color: var(--accent); text-decoration: none }
+    a:hover{ text-decoration: underline }
+    code.kv{ background:#0f1318; border:1px solid var(--border); padding:2px 6px; border-radius:6px }
+    @media (max-width: 720px){
+      .col-6, .col-4, .col-3, .col-2 { grid-column: span 12 }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Open Source Government Transcripts</h1>
+    <span class="pill">Client-only UI • Dark</span>
+  </header>
+
+  <main>
+    <section class="controls">
+      <div class="stack col-6">
+        <label for="backend">Transcript API (backend)</label>
+        <input id="backend" type="url" placeholder="https://your-vercel-app.vercel.app/api" />
+        <div class="note">Tip: you can also pass <code class="kv">?backend=...</code> in the URL.</div>
+      </div>
+
+      <div class="stack col-6">
+        <label for="ytkey">YouTube API Key</label>
+        <input id="ytkey" type="text" placeholder="AIza... (or set ?ytkey=... in URL)" />
+        <div class="note">Used to list videos by channel via YouTube Data API v3.</div>
+      </div>
+
+      <div class="stack col-6">
+        <label for="channel">Channel URL or ID</label>
+        <input id="channel" type="text" placeholder="e.g. https://www.youtube.com/channel/UC-sgxA1fdoxteLNzRAUHIxA or UC-..." />
+        <div class="note">Paste a channel URL (preferred) or a bare channel ID. Handles <code class="kv">/channel/UC…</code>, short <code class="kv">youtu.be</code> forms, or a plain <code class="kv">UC…</code> ID.</div>
+      </div>
+
+      <div class="stack col-3">
+        <label for="from">From (local date)</label>
+        <input id="from" type="date" />
+      </div>
+      <div class="stack col-3">
+        <label for="to">To (local date)</label>
+        <input id="to" type="date" />
+      </div>
+
+      <div class="stack col-12">
+        <div class="row">
+          <button id="btnFetch" class="btn btn-primary">Fetch Videos</button>
+          <button id="btnClear" class="btn">Clear</button>
+          <label class="row" style="gap:6px;">
+            <input id="chkDebug" type="checkbox" />
+            <span class="note">Show debug (add <code class="kv">&amp;debug=1</code> to transcript calls)</span>
+          </label>
+          <span id="status" class="note"></span>
+        </div>
+      </div>
+    </section>
+
+    <div id="notice" class="note" style="margin-top:10px"></div>
+
+    <section id="results" class="results"></section>
+
+    <section class="footer">
+      <div>URL params supported: <code class="kv">backend</code>, <code class="kv">ytkey</code>, <code class="kv">channel</code>, <code class="kv">from</code>, <code class="kv">to</code>, <code class="kv">debug</code>.</div>
+      <div class="note" style="margin-top:6px;">Example: <code class="kv">?backend=https://your-app.vercel.app/api&amp;ytkey=AIza...&amp;channel=UC-sgxA1fdoxteLNzRAUHIxA</code></div>
+    </section>
+  </main>
+
+  <script>
+  // ------------------------
+  // Small utilities
+  // ------------------------
+  function $(sel){ return document.querySelector(sel); }
+  function getParam(name){
+    const u = new URL(location.href);
+    return u.searchParams.get(name);
+  }
+  function setIf(el, val){ if (val) el.value = val; }
+  function logStatus(msg){ $('#status').textContent = msg || ''; }
+  function setNotice(msg){ $('#notice').textContent = msg || ''; }
+
+  // Parse various channel input forms -> UC... channelId
+  function parseChannelInput(raw){
+    if (!raw) return '';
+    const s = String(raw).trim();
+    // Bare UC... ID
+    if (/^UC[a-zA-Z0-9_-]{22}$/.test(s)) return s;
+    try {
+      const u = new URL(s);
+      // /channel/UC... (preferred)
+      const parts = u.pathname.split('/').filter(Boolean);
+      const chanIdx = parts.indexOf('channel');
+      if (chanIdx >= 0 && parts[chanIdx+1] && /^UC[a-zA-Z0-9_-]{22}$/.test(parts[chanIdx+1])){
+        return parts[chanIdx+1];
+      }
+      // Other forms (@handle or /user/) require an extra API call to resolve; keeping simple.
+      // If a handle is provided, user should click through to the channel and copy the channel URL.
+    } catch {}
+    return '';
+  }
+
+  // ------------------------
+  // Date helpers (UTC bounds)
+  // ------------------------
+  function toUtcStart(d){
+    const dt = (d instanceof Date) ? d : new Date(d);
+    if (isNaN(+dt)) return null;
+    return new Date(Date.UTC(dt.getFullYear(), dt.getMonth(), dt.getDate(), 0, 0, 0, 0));
+  }
+  function toUtcEnd(d){
+    const dt = (d instanceof Date) ? d : new Date(d);
+    if (isNaN(+dt)) return null;
+    return new Date(Date.UTC(dt.getFullYear(), dt.getMonth(), dt.getDate(), 23, 59, 59, 999));
+  }
+  function clampBeforeToNow(before){
+    const now = new Date();
+    if (!before) return now;
+    return (before > now) ? new Date(now.getTime() - 1000) : before;
+  }
+
+  // ------------------------
+  // YouTube Data API helpers
+  // ------------------------
+  async function ytSearch(opts){
+    const { channelId, apiKey, publishedAfter, publishedBefore, maxResults = 50 } = (opts || {});
+    if (!channelId || !apiKey) throw new Error('ytSearch: channelId and apiKey are required');
+    const params = new URLSearchParams({
+      key: apiKey,
+      part: 'snippet',
+      type: 'video',
+      order: 'date',
+      maxResults: String(maxResults),
+      channelId
+    });
+    if (publishedAfter)  params.set('publishedAfter', publishedAfter);
+    if (publishedBefore) params.set('publishedBefore', publishedBefore);
+    const url = 'https://www.googleapis.com/youtube/v3/search?' + params.toString();
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('YouTube API error: ' + r.status);
+    return r.json();
+  }
+
+  async function ytSearchWithFallback(opts){
+    const now = new Date();
+    const hasAfter = !!opts?.publishedAfter;
+    const hasBefore = !!opts?.publishedBefore;
+    const startUtc = hasAfter ? toUtcStart(opts.publishedAfter) : null;
+    let endUtc = hasBefore ? toUtcEnd(opts.publishedBefore) : null;
+    endUtc = clampBeforeToNow(endUtc || now);
+
+    // First try requested window if any bound provided
+    if (hasAfter || hasBefore){
+      const first = await ytSearch({
+        ...opts,
+        publishedAfter: startUtc ? startUtc.toISOString() : undefined,
+        publishedBefore: endUtc ? endUtc.toISOString() : undefined
+      });
+      if (first?.items?.length) return { items: first.items };
+    } else {
+      // No bounds provided: try last 12 months immediately
+      const yearAgo = new Date(endUtc);
+      yearAgo.setUTCDate(yearAgo.getUTCDate() - 365);
+      const wide = await ytSearch({
+        ...opts,
+        publishedAfter: yearAgo.toISOString(),
+        publishedBefore: endUtc.toISOString()
+      });
+      if (wide?.items?.length) return { items: wide.items };
+    }
+
+    // Fallback 1: last 12 months from now
+    const yearAgo = new Date(now); yearAgo.setUTCDate(yearAgo.getUTCDate() - 365);
+    const second = await ytSearch({
+      ...opts,
+      publishedAfter: yearAgo.toISOString(),
+      publishedBefore: now.toISOString()
+    });
+    if (second?.items?.length) return { items: second.items, note: 'No videos in that range. Showing last 12 months.' };
+
+    // Fallback 2: no dates at all (latest uploads)
+    const third = await ytSearch({ ...opts, publishedAfter: undefined, publishedBefore: undefined });
+    if (third?.items?.length) return { items: third.items, note: 'No videos in that range. Showing latest uploads.' };
+
+    return { items: [], note: 'No videos found for this channel.' };
+  }
+
+  // ------------------------
+  // Transcript API
+  // ------------------------
+  async function fetchTranscript({ backend, videoId, debug }){
+    if (!backend){
+      return { success:false, reason:'no_backend', segments:[] };
+    }
+    const u = new URL(backend.replace(/\/+$/,'') + '/transcript');
+    u.searchParams.set('id', videoId);
+    if (debug) u.searchParams.set('debug','1');
+    const r = await fetch(u.toString());
+    if (!r.ok){
+      return { success:false, reason:'backend_error:'+r.status };
+    }
+    return r.json();
+  }
+
+  function formatTime(sec){
+    const s = Math.floor(Number(sec) || 0);
+    const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), ss = s%60;
+    const hh = h>0 ? h.toString().padStart(2,'0')+':' : '';
+    return hh + m.toString().padStart(2,'0') + ':' + ss.toString().padStart(2,'0');
+  }
+
+  // ------------------------
+  // UI glue
+  // ------------------------
+  const els = {
+    backend: $('#backend'),
+    ytkey:   $('#ytkey'),
+    channel: $('#channel'),
+    from:    $('#from'),
+    to:      $('#to'),
+    btnFetch:$('#btnFetch'),
+    btnClear:$('#btnClear'),
+    results: $('#results'),
+    debug:   $('#chkDebug')
+  };
+
+  // Prefill from URL params
+  setIf(els.backend, getParam('backend'));
+  setIf(els.ytkey,   getParam('ytkey'));
+  setIf(els.channel, getParam('channel'));
+  setIf(els.from,    getParam('from'));
+  setIf(els.to,      getParam('to'));
+  if (getParam('debug') === '1') els.debug.checked = true;
+
+  // Default helpful values (optional)
+  if (!els.channel.value) els.channel.value = "https://www.youtube.com/channel/UC-sgxA1fdoxteLNzRAUHIxA"; // Town of Nantucket
+  // Optional: set default 'from' to 1 year ago
+  if (!els.from.value){
+    const d = new Date(); d.setDate(d.getDate()-365);
+    els.from.valueAsDate = d;
+  }
+
+  els.btnClear.addEventListener('click', () => {
+    els.from.value = ''; els.to.value = '';
+    setNotice('Date filters cleared. Fetching will use a smart fallback window.');
+  });
+
+  els.btnFetch.addEventListener('click', onFetch);
+
+  async function onFetch(){
+    try{
+      setNotice('');
+      logStatus('Fetching…');
+      els.results.innerHTML = '';
+
+      const channelId = parseChannelInput(els.channel.value);
+      if (!channelId){
+        logStatus('');
+        setNotice('Please paste a full channel URL like https://www.youtube.com/channel/UC-…');
+        return;
+      }
+      const apiKey = (els.ytkey.value || '').trim();
+      if (!apiKey){
+        logStatus('');
+        setNotice('Missing YouTube API key. Add it in the field above or pass ?ytkey=... in the URL.');
+        return;
+      }
+
+      const { items, note } = await ytSearchWithFallback({
+        channelId,
+        apiKey,
+        publishedAfter: els.from.value || undefined,
+        publishedBefore: els.to.value || undefined,
+        maxResults: 50
+      });
+      if (note) setNotice(note);
+      renderVideoList(items || []);
+
+      if (!items || !items.length){
+        logStatus('');
+        setNotice(note || 'No videos returned for this channel.');
+      } else {
+        logStatus(`Loaded ${items.length} videos.`);
+      }
+    } catch (e){
+      logStatus('');
+      setNotice('Error: ' + (e && e.message ? e.message : e));
+    }
+  }
+
+  function renderVideoList(items){
+    const frag = document.createDocumentFragment();
+    for (const it of items){
+      const v = it.id && (it.id.videoId || it.id);
+      const sn = it.snippet || {};
+      const card = document.createElement('div');
+      card.className = 'card';
+
+      const title = document.createElement('div');
+      title.className = 'title';
+      const a = document.createElement('a');
+      a.href = `https://www.youtube.com/watch?v=${v}`;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.textContent = sn.title || 'Untitled';
+      title.appendChild(a);
+
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      const dt = sn.publishedAt ? new Date(sn.publishedAt) : null;
+      meta.textContent = dt ? dt.toLocaleString() : '';
+
+      const row = document.createElement('div');
+      row.className = 'row';
+
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-primary';
+      btn.textContent = 'Fetch Transcript';
+      btn.addEventListener('click', () => onTranscript(v, card));
+
+      const ylink = document.createElement('a');
+      ylink.href = `https://www.youtube.com/watch?v=${v}`;
+      ylink.target = '_blank';
+      ylink.rel = 'noopener';
+      ylink.className = 'badg';
+      ylink.textContent = 'Open on YouTube';
+
+      row.appendChild(btn);
+      row.appendChild(ylink);
+
+      const box = document.createElement('div');
+      box.className = 'transcript';
+      box.textContent = '—';
+
+      card.appendChild(title);
+      card.appendChild(meta);
+      card.appendChild(row);
+      card.appendChild(box);
+      frag.appendChild(card);
+    }
+    els.results.innerHTML = '';
+    els.results.appendChild(frag);
+  }
+
+  async function onTranscript(videoId, card){
+    const box = card.querySelector('.transcript');
+    box.textContent = 'Loading transcript…';
+    const backend = els.backend.value.trim() || getParam('backend');
+    const debug = els.debug.checked || getParam('debug') === '1';
+
+    const data = await fetchTranscript({ backend, videoId, debug });
+    if (!data || data.success !== true){
+      const reason = data && data.reason || 'unknown';
+      if (reason === 'no_backend'){
+        box.innerHTML = 'No backend configured.<br/>Pass <code class="kv">?backend=https://your-app.vercel.app/api</code> in the URL or fill the field above.';
+        return;
+      }
+      if (reason === 'no_captions'){
+        box.textContent = 'No public transcript for this video.';
+        return;
+      }
+      box.textContent = 'Error fetching transcript: ' + reason;
+      return;
+    }
+    const segs = Array.isArray(data.segments) ? data.segments : [];
+    if (!segs.length){
+      box.textContent = 'Transcript empty.';
+      return;
+    }
+    const lines = segs.map(s => `[${formatTime(s.start)}] ${s.text}`);
+    const pathInfo = data.path ? ` (source: ${data.path}${data.language ? ', ' + data.language : ''})` : '';
+    box.textContent = lines.join('\n') + '\n' + (pathInfo || '');
+  }
+
+  // Auto-fetch on load if params provided
+  window.addEventListener('DOMContentLoaded', () => {
+    if (els.backend.value) setNotice('Backend set from URL.');
+    if (els.ytkey.value && els.channel.value){
+      onFetch();
+    }
+  });
+  </script>
+</body>
+</html>
